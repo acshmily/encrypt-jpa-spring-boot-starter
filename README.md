@@ -35,7 +35,7 @@ acshmily:
     encryptIv: 1234567890123456
 ```
 
-3、修改你的entity对象，在需要加密的String字段上添加**@Encrypt**注解
+3、修改你的entity对象，在需要加密的String字段上添加 ** @Encrypt ** 注解
 
 ```java
 @Entity
@@ -55,7 +55,7 @@ public class TestEncryp {
 ## License
 
 ```
-          											Apache License
+          Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
