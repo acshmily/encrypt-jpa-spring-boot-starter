@@ -13,10 +13,10 @@ import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 
 /**
- * @Author: Huanghz
- * @Description: 自动注册方法
- * @Date:Created in 2:05 下午 2020/7/6
- * @ModifyBy:
+ * @author: Huanghz
+ * description: 自动注册方法
+ * date:Created in 2:05 下午 2020/7/6
+ * modifyBy:
  **/
 @Configuration
 @EnableConfigurationProperties(EncryptProperties.class)

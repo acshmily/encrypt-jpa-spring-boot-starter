@@ -20,24 +20,24 @@ import java.security.InvalidKeyException;
 import java.util.Properties;
 
 /**
- * @Author: Huanghz
- * @Description: 加密/解密工具类
- * @Date:Created in 10:41 上午 2020/7/6
- * @ModifyBy:
+ * @author: Huanghz
+ * description: 加密/解密工具类
+ * date:Created in 10:41 上午 2020/7/6
+ * modifyBy:
  **/
 public class EncryptUtils {
     /**
      * 加密
      * @param text 需要加密的明文
-     * @param key
-     * @param iv
+     * @param key key
+     * @param iv iv
      * @return 经过base64加密后的密文
-     * @throws IOException
-     * @throws InvalidAlgorithmParameterException
-     * @throws InvalidKeyException
-     * @throws ShortBufferException
-     * @throws BadPaddingException
-     * @throws IllegalBlockSizeException
+     * @throws IOException IOException
+     * @throws InvalidAlgorithmParameterException InvalidAlgorithmParameterException
+     * @throws InvalidKeyException InvalidKeyException
+     * @throws ShortBufferException ShortBufferException
+     * @throws BadPaddingException BadPaddingException
+     * @throws IllegalBlockSizeException IllegalBlockSizeException
      */
     public static String encrypt(String text,SecretKeySpec key,IvParameterSpec iv) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, ShortBufferException, BadPaddingException, IllegalBlockSizeException {
         Properties properties = new Properties();
@@ -78,15 +78,15 @@ public class EncryptUtils {
     /**
      * 解密
      * @param encodedString 经过base64加密后的密文
-     * @param key
-     * @param iv
+     * @param key key
+     * @param iv iv
      * @return 明文
-     * @throws IOException
-     * @throws InvalidAlgorithmParameterException
-     * @throws InvalidKeyException
-     * @throws ShortBufferException
-     * @throws BadPaddingException
-     * @throws IllegalBlockSizeException
+     * @throws IOException IOException
+     * @throws InvalidAlgorithmParameterException InvalidAlgorithmParameterException
+     * @throws InvalidKeyException InvalidKeyException
+     * @throws ShortBufferException ShortBufferException
+     * @throws BadPaddingException BadPaddingException
+     * @throws IllegalBlockSizeException IllegalBlockSizeException
      */
     public static String deEncrypt(String encodedString,SecretKeySpec key,IvParameterSpec iv) throws IOException, InvalidAlgorithmParameterException, InvalidKeyException, ShortBufferException, BadPaddingException, IllegalBlockSizeException {
         Properties properties = new Properties();

@@ -27,10 +27,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * @Author: Huanghz
- * @Description: Aop拦截
- * @Date:Created in 4:30 下午 2020/7/2
- * @ModifyBy:
+ * @author: Huanghz
+ * description: Aop拦截
+ * date:Created in 4:30 下午 2020/7/2
+ * modifyBy:
  **/
 @Aspect
 public class EncryptInterceptor{
@@ -45,10 +45,7 @@ public class EncryptInterceptor{
     @Pointcut("execution(public * org.springframework.data.jpa.repository.JpaRepository+.find*(..))")
     public void find(){ }
 
-    /**
-     * 保存前处理
-     * @return
-     */
+
     @Before(value = "save()")
     public void doEncrypt(JoinPoint jp) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, BadPaddingException, InvalidKeyException, IOException, ShortBufferException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
         // 1.判断该字段是否有注解
@@ -69,20 +66,6 @@ public class EncryptInterceptor{
 
     }
 
-    /**
-     * 查询出来将注解解密
-     * @param jp
-     * @param result
-     * @throws NoSuchMethodException
-     * @throws InvocationTargetException
-     * @throws IllegalAccessException
-     * @throws BadPaddingException
-     * @throws InvalidKeyException
-     * @throws IOException
-     * @throws ShortBufferException
-     * @throws IllegalBlockSizeException
-     * @throws InvalidAlgorithmParameterException
-     */
     @AfterReturning(value = "find()",returning = "result")
     public void doDeEncrypt(JoinPoint jp,Object result) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, BadPaddingException, InvalidKeyException, IOException, ShortBufferException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
         // if result is list
@@ -108,19 +91,6 @@ public class EncryptInterceptor{
         }
     }
 
-    /**
-     * 解密封装方法
-     * @param obj
-     * @throws NoSuchMethodException
-     * @throws InvocationTargetException
-     * @throws IllegalAccessException
-     * @throws BadPaddingException
-     * @throws InvalidKeyException
-     * @throws IOException
-     * @throws ShortBufferException
-     * @throws IllegalBlockSizeException
-     * @throws InvalidAlgorithmParameterException
-     */
 
     private  void deEncrypt(Object obj) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, BadPaddingException, InvalidKeyException, IOException, ShortBufferException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
         Field[] fields = obj.getClass().getDeclaredFields();
@@ -143,8 +113,8 @@ public class EncryptInterceptor{
 
     /**
      * 获取Get方法名
-     * @param fieldName
-     * @return
+     * @param fieldName  fieldName
+     * @return string
      */
     private static String getMethodName(String fieldName) {
         byte[] items = fieldName.getBytes();

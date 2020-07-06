@@ -10,10 +10,10 @@ import java.util.List;
 import static com.github.acshmily.utils.EncryptUtils.getUTF8Bytes;
 
 /**
- * @Author: Huanghz
- * @Description: 配置类
- * @Date:Created in 4:11 下午 2020/7/2
- * @ModifyBy:
+ * @author: Huanghz
+ * description: 配置类
+ * date:Created in 4:11 下午 2020/7/2
+ * modifyBy:
  **/
 @ConfigurationProperties(prefix = "acshmily.encrypt")
 public class EncryptProperties {
