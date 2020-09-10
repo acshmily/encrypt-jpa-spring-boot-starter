@@ -4,6 +4,14 @@
 
 ​		基于JPA对需要加密的String 字段进行加密，入侵性较小（仅在需要加密的Entity对象属性上添加注解即可），采用AES对称加密保证了效率和安全性
 
+LastUpdate:
+
+   - 2020年09月10日:
+    
+        - 新增了@EncryptParam注解方法，解决了参数加密问题;
+        - 新增了JpaEncryptService接口并注册到Spring可以直接注入使用
+        - 修复部分bug
+
 目前已经实现：
 
 - 对所有save方法进行加密后保存
@@ -21,7 +29,7 @@
 <dependency>
   <groupId>com.github.acshmily</groupId>
   <artifactId>encrypt-jpa-spring-boot-starter</artifactId>
-  <version>1.0-RELEASE</version>
+  <version>1.1-RELEASE</version>
 </dependency>
 ```
 
@@ -35,13 +43,13 @@ acshmily:
     encryptIv: 1234567890123456
 ```
 
-3、修改你的entity对象，在需要加密的String字段上添加 ** @Encrypt ** 注解
+3、修改你的entity对象，在需要加密的String字段上添加 **@Encrypt** 注解
 
 ```java
 @Entity
 @Data
 @ToString
-public class TestEncryp {
+public class TestEncrypt {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -50,8 +58,40 @@ public class TestEncryp {
 
 ```
 
+4、如果重写或者新增find*方法，使用**@EncryptParam**注释，使用该注释的参数会被执行查询的时候自动加密
+```java
+@Repository
+public interface EncryptDao extends JpaRepository<TestEncrypt,Long> {
+    Page<TestEncryp> findAllByIdGreaterThan(Long id,Pageable pageable);
+    TestEncryp findByUsername(@EncryptParam @Param("username") String username);
+    TestEncryp findByIdAndUsername(@EncryptParam Long id,@EncryptParam String username);
+}
+```
+5、如果需要自己执行加密解密操作可以直接使用注解,使用**jpaEncryptService**的相关方法
+```java
+@Resource
+private JpaEncryptService jpaEncryptService;
 
+```
+JpaEncryptService定义方法如下:
+```java
+public interface JpaEncryptService {
+    /**
+     * 加密方法
+     * @param rawString
+     * @return
+     */
+    String encrypt(@NotNull String rawString);
 
+    /**
+     * 解密方法
+     * @param encryptString
+     * @return
+     */
+    String deEncrypt(@NotNull String encryptString);
+
+}
+```
 ## License
 
 ```

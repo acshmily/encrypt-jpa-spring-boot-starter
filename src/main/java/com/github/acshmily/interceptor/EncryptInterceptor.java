@@ -1,22 +1,28 @@
 package com.github.acshmily.interceptor;
 
 import com.github.acshmily.annotation.Encrypt;
+
+import com.github.acshmily.annotation.EncryptParam;
 import com.github.acshmily.config.EncryptProperties;
 import com.github.acshmily.utils.EncryptUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.*;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.ShortBufferException;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -24,6 +30,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -34,6 +41,7 @@ import java.util.Optional;
  **/
 @Aspect
 public class EncryptInterceptor{
+
     /**
      * 保存切入点
      */
@@ -46,10 +54,33 @@ public class EncryptInterceptor{
     public void find(){ }
 
 
-    @Before(value = "save()")
-    public void doEncrypt(JoinPoint jp) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, BadPaddingException, InvalidKeyException, IOException, ShortBufferException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+    @Around(value = "save() || find()")
+    public Object doEncrypt(ProceedingJoinPoint jp) throws Throwable {
+        Object[] args = jp.getArgs();
+        if(args.length <= 0){
+            return jp.proceed();
+        }
+        MethodSignature signature= (MethodSignature) jp.getSignature();
+        Annotation[][] parameterAnnotations= signature.getMethod().getParameterAnnotations();
+
+        for (Annotation[] parameterAnnotation: parameterAnnotations) {
+            int paramIndex = ArrayUtils.indexOf(parameterAnnotations, parameterAnnotation);
+            for (Annotation annotation: parameterAnnotation) {
+                if (annotation instanceof EncryptParam){
+                    // 获取有该注解的值
+                    Object paramValue = args[paramIndex];
+                    log.debug("该注解的参数值为:{}",paramValue);
+                    if(args[paramIndex] instanceof String){
+                        String encryptString = EncryptUtils.encrypt((String)args[paramIndex],encryptProperties.getKey(),encryptProperties.getIv());
+                        args[paramIndex] = encryptString;
+
+                    }
+                }
+            }
+        }
+        // ######对象字段加密判断
         // 1.判断该字段是否有注解
-        Field[] fields = jp.getArgs()[0].getClass().getDeclaredFields();
+        Field[] fields = args[0].getClass().getDeclaredFields();
         for(Field field : fields){
             if(field.getAnnotation(Encrypt.class) != null){
                 // 2.加密字段所在值,并且值对String属性生效
@@ -63,7 +94,7 @@ public class EncryptInterceptor{
             }
 
         }
-
+        return jp.proceed(args);
     }
 
     @AfterReturning(value = "find()",returning = "result")
@@ -93,20 +124,22 @@ public class EncryptInterceptor{
 
 
     private  void deEncrypt(Object obj) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, BadPaddingException, InvalidKeyException, IOException, ShortBufferException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
-        Field[] fields = obj.getClass().getDeclaredFields();
-        for(Field field : fields){
-            if(field.getAnnotation(Encrypt.class) != null){
-                // 2.加密字段所在值,并且值对String属性生效
-                if (field.getGenericType().toString().equals("class java.lang.String")) {
-                    Method get = (Method) obj.getClass().getMethod("get"+ getMethodName(field.getName()));
+        if(Objects.nonNull(obj)){
+            Field[] fields = obj.getClass().getDeclaredFields();
+            for(Field field : fields){
+                if(field.getAnnotation(Encrypt.class) != null){
+                    // 2.加密字段所在值,并且值对String属性生效
+                    if (field.getGenericType().toString().equals("class java.lang.String")) {
+                        Method get = (Method) obj.getClass().getMethod("get"+ getMethodName(field.getName()));
 
-                    String val = (String) get.invoke(obj);
-                    // 2.1 加密
-                    Method set = (Method) obj.getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
-                    set.invoke(obj,EncryptUtils.deEncrypt(val,encryptProperties.getKey(),encryptProperties.getIv()));
+                        String val = (String) get.invoke(obj);
+                        // 2.1 加密
+                        Method set = (Method) obj.getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
+                        set.invoke(obj,EncryptUtils.deEncrypt(val,encryptProperties.getKey(),encryptProperties.getIv()));
+                    }
                 }
-            }
 
+            }
         }
     }
 
