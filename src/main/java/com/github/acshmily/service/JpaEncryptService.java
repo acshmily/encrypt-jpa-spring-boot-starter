@@ -3,10 +3,10 @@ package com.github.acshmily.service;
 import com.sun.istack.NotNull;
 
 /**
- * @Author: Huanghz
- * @Description: Jpa加密解密接口
- * @Date:Created in 1:36 下午 2020/9/10
- * @ModifyBy:
+ * @author: Huanghz
+ * description: Jpa加密解密接口
+ * date:Created in 1:36 下午 2020/9/10
+ * modifyBy:
  **/
 public interface JpaEncryptService {
     /**
