@@ -29,7 +29,7 @@ LastUpdate:
 <dependency>
   <groupId>com.github.acshmily</groupId>
   <artifactId>encrypt-jpa-spring-boot-starter</artifactId>
-  <version>1.1-RELEASE</version>
+  <version>1.1.1-RELEASE</version>
 </dependency>
 ```
 
