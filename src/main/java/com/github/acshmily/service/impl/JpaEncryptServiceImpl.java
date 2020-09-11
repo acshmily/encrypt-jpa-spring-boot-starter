@@ -70,5 +70,5 @@ public class JpaEncryptServiceImpl implements JpaEncryptService {
     }
     @Resource
     private EncryptProperties encryptProperties;
-    Logger log = LoggerFactory.getLogger(JpaEncryptServiceImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(JpaEncryptServiceImpl.class);
 }

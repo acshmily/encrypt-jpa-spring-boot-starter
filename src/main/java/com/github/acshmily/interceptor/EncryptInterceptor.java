@@ -12,10 +12,9 @@ import org.aspectj.lang.annotation.*;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
 import org.springframework.data.domain.Page;
-import org.springframework.stereotype.Component;
+
 
 import javax.annotation.Resource;
 import javax.crypto.BadPaddingException;
@@ -28,7 +27,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -85,10 +83,10 @@ public class EncryptInterceptor{
             if(field.getAnnotation(Encrypt.class) != null){
                 // 2.加密字段所在值,并且值对String属性生效
                 if (field.getGenericType().toString().equals("class java.lang.String")) {
-                    Method get = (Method) jp.getArgs()[0].getClass().getMethod("get"+ getMethodName(field.getName()));
+                    Method get = jp.getArgs()[0].getClass().getMethod("get"+ getMethodName(field.getName()));
                     String val = (String) get.invoke(jp.getArgs()[0]);
                     // 2.1 加密
-                    Method set = (Method) jp.getArgs()[0].getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
+                    Method set = jp.getArgs()[0].getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
                     set.invoke(jp.getArgs()[0], EncryptUtils.encrypt(val,encryptProperties.getKey(),encryptProperties.getIv()));
                 }
             }
@@ -130,11 +128,11 @@ public class EncryptInterceptor{
                 if(field.getAnnotation(Encrypt.class) != null){
                     // 2.加密字段所在值,并且值对String属性生效
                     if (field.getGenericType().toString().equals("class java.lang.String")) {
-                        Method get = (Method) obj.getClass().getMethod("get"+ getMethodName(field.getName()));
+                        Method get = obj.getClass().getMethod("get"+ getMethodName(field.getName()));
 
                         String val = (String) get.invoke(obj);
                         // 2.1 加密
-                        Method set = (Method) obj.getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
+                        Method set = obj.getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
                         set.invoke(obj,EncryptUtils.deEncrypt(val,encryptProperties.getKey(),encryptProperties.getIv()));
                     }
                 }
