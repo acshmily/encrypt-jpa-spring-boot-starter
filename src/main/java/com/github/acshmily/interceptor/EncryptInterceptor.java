@@ -4,6 +4,7 @@ import com.github.acshmily.annotation.Encrypt;
 
 import com.github.acshmily.annotation.EncryptParam;
 import com.github.acshmily.config.EncryptProperties;
+import com.github.acshmily.utils.EncryptCacheContainer;
 import com.github.acshmily.utils.EncryptUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.aspectj.lang.JoinPoint;
@@ -27,6 +28,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -58,29 +60,58 @@ public class EncryptInterceptor{
         if(args.length <= 0){
             return jp.proceed();
         }
-        MethodSignature signature= (MethodSignature) jp.getSignature();
-        Annotation[][] parameterAnnotations= signature.getMethod().getParameterAnnotations();
+        Annotation[][] parameterAnnotations;
+        boolean paramCache = false;
+        MethodSignature signature = (MethodSignature) jp.getSignature();
+        List<Annotation[]> needCacheAnnotations = new ArrayList<>();
+        // 判断参数是否命中
+        if(cacheContainer.existMethodSignature(signature.getMethod())){
+            parameterAnnotations = cacheContainer.getMethodSignature(signature.getMethod());
+            log.debug("命中方法缓存:{}",signature);
+        }else{
+            log.debug("没有命中方法缓存:{}",signature);
+            parameterAnnotations = signature.getMethod().getParameterAnnotations();
+        }
 
         for (Annotation[] parameterAnnotation: parameterAnnotations) {
             int paramIndex = ArrayUtils.indexOf(parameterAnnotations, parameterAnnotation);
             for (Annotation annotation: parameterAnnotation) {
                 if (annotation instanceof EncryptParam){
+                    // 命中需要缓存的数据
+                    paramCache = true;
                     // 获取有该注解的值
                     Object paramValue = args[paramIndex];
                     log.debug("该注解的参数值为:{}",paramValue);
                     if(args[paramIndex] instanceof String){
                         String encryptString = EncryptUtils.encrypt((String)args[paramIndex],encryptProperties.getKey(),encryptProperties.getIv());
                         args[paramIndex] = encryptString;
-
                     }
+                    // 添加到待缓存队列中
+                    needCacheAnnotations.add(parameterAnnotation);
                 }
             }
         }
+        // 不是从缓存中读取，进行缓存
+        if(paramCache){
+            cacheContainer.addMethodSignature(signature.getMethod(),needCacheAnnotations.toArray(new Annotation[needCacheAnnotations.size()][]));
+        }
+        // 需要缓存的字段
+        List<Field> needCacheFields = new ArrayList<>();
+        boolean fieldCheck = false;
+        Field[] fields;
+        if(cacheContainer.existClassFields(args[0].getClass())){
+            fields = cacheContainer.getClassFields(args[0].getClass());
+            log.debug("命中类缓存:{}",args[0].getClass());
+        }else{
+            fields = args[0].getClass().getDeclaredFields();
+            log.debug("没有命中类缓存:{}",args[0].getClass());
+
+        }
         // ######对象字段加密判断
         // 1.判断该字段是否有注解
-        Field[] fields = args[0].getClass().getDeclaredFields();
         for(Field field : fields){
             if(field.getAnnotation(Encrypt.class) != null){
+                fieldCheck = true;
                 // 2.加密字段所在值,并且值对String属性生效
                 if (field.getGenericType().toString().equals("class java.lang.String")) {
                     Method get = jp.getArgs()[0].getClass().getMethod("get"+ getMethodName(field.getName()));
@@ -88,9 +119,15 @@ public class EncryptInterceptor{
                     // 2.1 加密
                     Method set = jp.getArgs()[0].getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
                     set.invoke(jp.getArgs()[0], EncryptUtils.encrypt(val,encryptProperties.getKey(),encryptProperties.getIv()));
+                    // 2.2 记录缓存字段
+                    needCacheFields.add(field);
                 }
             }
 
+        }
+        // 如果未缓存则缓存
+        if(fieldCheck){
+            cacheContainer.addClassFields(args[0].getClass(),needCacheFields.toArray(new Field[needCacheFields.size()]));
         }
         return jp.proceed(args);
     }
@@ -123,9 +160,21 @@ public class EncryptInterceptor{
 
     private  void deEncrypt(Object obj) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, BadPaddingException, InvalidKeyException, IOException, ShortBufferException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
         if(Objects.nonNull(obj)){
-            Field[] fields = obj.getClass().getDeclaredFields();
+            // 需要缓存的字段
+            List<Field> needCacheFields = new ArrayList<>();
+            boolean fieldCheck = false;
+            Field[] fields;
+            if(cacheContainer.existClassFields(obj.getClass())){
+                log.debug("命中类缓存:{}",obj.getClass());
+                fields = cacheContainer.getClassFields(obj.getClass());
+            }else{
+                fields = obj.getClass().getDeclaredFields();
+                log.debug("没有命中类缓存:{}",obj.getClass());
+
+            }
             for(Field field : fields){
                 if(field.getAnnotation(Encrypt.class) != null){
+                    fieldCheck = true;
                     // 2.加密字段所在值,并且值对String属性生效
                     if (field.getGenericType().toString().equals("class java.lang.String")) {
                         Method get = obj.getClass().getMethod("get"+ getMethodName(field.getName()));
@@ -134,9 +183,15 @@ public class EncryptInterceptor{
                         // 2.1 加密
                         Method set = obj.getClass().getMethod("set"+ getMethodName(field.getName()),String.class);
                         set.invoke(obj,EncryptUtils.deEncrypt(val,encryptProperties.getKey(),encryptProperties.getIv()));
+                        // 2.2 记录缓存字段
+                        needCacheFields.add(field);
                     }
                 }
 
+            }
+            // 如果未缓存则缓存
+            if(fieldCheck){
+                cacheContainer.addClassFields(obj.getClass(),needCacheFields.toArray(new Field[needCacheFields.size()]));
             }
         }
     }
@@ -156,4 +211,6 @@ public class EncryptInterceptor{
     private static final Logger log = LoggerFactory.getLogger(EncryptInterceptor.class);
     @Resource
     private EncryptProperties encryptProperties;
+    @Resource
+    private EncryptCacheContainer cacheContainer;
 }

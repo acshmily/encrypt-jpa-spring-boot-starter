@@ -3,6 +3,7 @@ package com.github.acshmily.config;
 import com.github.acshmily.interceptor.EncryptInterceptor;
 import com.github.acshmily.service.JpaEncryptService;
 import com.github.acshmily.service.impl.JpaEncryptServiceImpl;
+import com.github.acshmily.utils.EncryptCacheContainer;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -32,4 +33,6 @@ public class AutoEncryptConfig {
     }
     @Bean
     public JpaEncryptService jpaEncryptService(){return new JpaEncryptServiceImpl() ;}
+    @Bean
+    public EncryptCacheContainer encryptCacheContainer(){return new EncryptCacheContainer();}
 }
