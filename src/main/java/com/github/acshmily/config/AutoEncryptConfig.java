@@ -5,6 +5,8 @@ import com.github.acshmily.service.JpaEncryptService;
 import com.github.acshmily.service.impl.JpaEncryptServiceImpl;
 import com.github.acshmily.utils.EncryptCacheContainer;
 import org.aspectj.lang.annotation.Aspect;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -29,10 +31,18 @@ public class AutoEncryptConfig {
 
     @Bean
     public EncryptInterceptor encryptInterceptor(){
+        log.info("数据库加密拦截器开始初始化");
         return new EncryptInterceptor();
     }
     @Bean
-    public JpaEncryptService jpaEncryptService(){return new JpaEncryptServiceImpl() ;}
+    public JpaEncryptService jpaEncryptService(){
+        log.info("数据库加密服务类开始初始化");
+        return new JpaEncryptServiceImpl();
+    }
     @Bean
-    public EncryptCacheContainer encryptCacheContainer(){return new EncryptCacheContainer();}
+    public EncryptCacheContainer encryptCacheContainer(){
+        log.info("数据库加密缓存服务类开始初始化");
+        return new EncryptCacheContainer();
+    }
+    private static final Logger log = LoggerFactory.getLogger(AutoEncryptConfig.class);
 }

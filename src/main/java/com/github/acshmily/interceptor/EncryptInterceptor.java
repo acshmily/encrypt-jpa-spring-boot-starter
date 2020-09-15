@@ -45,12 +45,12 @@ public class EncryptInterceptor{
     /**
      * 保存切入点
      */
-    @Pointcut("execution(public * org.springframework.data.jpa.repository.JpaRepository+.save(..))")
+    @Pointcut("execution(public * org.springframework.data.jpa.repository.JpaRepository+.save(..)) || execution(public * org.springframework.data.repository.CrudRepository+.save(..)) || execution(public * org.springframework.data.repository.PagingAndSortingRepository+.save(..))")
     public void save(){ }
     /**
      * 查询切入点
      */
-    @Pointcut("execution(public * org.springframework.data.jpa.repository.JpaRepository+.find*(..))")
+    @Pointcut("execution(public * org.springframework.data.jpa.repository.JpaRepository+.find*(..)) || execution(public * org.springframework.data.repository.CrudRepository+.find*(..)) || execution(public * org.springframework.data.repository.PagingAndSortingRepository+.find*(..))")
     public void find(){ }
 
 

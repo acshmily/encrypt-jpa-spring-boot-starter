@@ -5,6 +5,9 @@
 ​		基于JPA对需要加密的String 字段进行加密，入侵性较小（仅在需要加密的Entity对象属性上添加注解即可），采用AES对称加密保证了效率和安全性
 
 LastUpdate:
+   - 2020年09月15日:
+        - 更新到了**1.1.3**版本
+        - 拦截器添加了CrudRepository、PagingAndSortingRepository
    - 2020年09月14日:
         - 更新到**1.1.2**版本，解决了重大缺陷，请务必更新
         - 优化了反射缓存机制，提高执行效率
@@ -31,7 +34,7 @@ LastUpdate:
 <dependency>
   <groupId>com.github.acshmily</groupId>
   <artifactId>encrypt-jpa-spring-boot-starter</artifactId>
-  <version>1.1.2-RELEASE</version>
+  <version>1.1.3-RELEASE</version>
 </dependency>
 ```
 
