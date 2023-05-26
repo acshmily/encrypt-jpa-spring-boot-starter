@@ -17,7 +17,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
-        <spring-boot.version>2.3.1.RELEASE</spring-boot.version>
+        <spring-boot.version>2.5.15</spring-boot.version>
         <commons-crypto.version>1.0.0</commons-crypto.version>
         <commons.lang3.version>3.8</commons.lang3.version>
     </properties>
