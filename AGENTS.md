@@ -139,6 +139,30 @@ Bean 覆盖：`EncryptCacheContainer` / `JpaEncryptService` / `EncryptIntercepto
    或 nexus-staging 插件。
 4. 发布后到 https://central.sonatype.com 验证可检索（同步有延迟）。
 
+### 已知坑：central-publishing 插件 0.11.0 多模块失败（2.0.0 发布时踩过）
+
+`mvn deploy` 时插件会把 `maven-metadata-local.xml` 与 `_remote.repositories*` 打进
+bundle，Portal 校验报 `Bundle has content that does NOT have a .pom file: <group 目录>`
+而失败（插件在各模块累积 staging，仅最后模块真正上传，所以失败只会发生在最后一个模块）。
+**可用发布方式**：deploy 失败后，产物已签名在 `target/central-staging`，从中剔除上述元数据
+文件打干净 zip，走 Portal REST API 上传：
+
+```bash
+# staging 目录在根 target/central-staging；剔除污染文件后打包
+cd target/central-staging
+find . -type f ! -name "_remote.repositories*" ! -name "maven-metadata-local.xml" \
+  -exec rsync -R {} /tmp/clean-staging/ \; && cd /tmp/clean-staging && zip -r ../bundle.zip .
+# 上传并自动发布（token 即 settings.xml 里 sonatype-central 的用户名/密码）
+curl -X POST "https://central.sonatype.com/api/v1/publisher/upload?publish=true" \
+  -u "$TOKEN_USER:$TOKEN_PASS" -F "bundle=@/tmp/bundle.zip"
+# 轮询（注意 /publisher/status 端点可能 500，用列表端点代替）
+curl -u "$TOKEN_USER:$TOKEN_PASS" \
+  "https://central.sonatype.com/api/v1/publisher/deployments?pageSize=5"
+```
+
+状态机：PENDING → VALIDATING/FAILED → PUBLISHING → PUBLISHED；PUBLISHED 后 repo1.maven.org
+同步最长约 30 分钟。已发布版本不可覆盖重传。
+
 注意：本机 Maven 走 aliyun 镜像（`mirrorOf: *`），若插件解析异常需检查镜像是否放行。
 
 ## 其他约定
