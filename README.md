@@ -1,5 +1,15 @@
 # encrypt-jpa-spring-boot-starter
 
+> **English documentation** is available at the bottom of this page — jump to
+> [English Documentation](#english-documentation).
+
+Transparent encryption for JPA `String` entity fields, built on Spring AOP interception of
+Spring Data repositories: annotate a field with `@Encrypt` and values are stored as AES
+ciphertext; queries return decrypted plaintext. Supports equality search on encrypted
+columns (`@EncryptParam`) and — as of 2.1.0 — **LIKE-style fuzzy search** via HMAC blind
+indexes (`@BlindIndex`). Ships two flavors: `javax` (Spring Boot 2.x, Java 8–21) and
+`jakarta` (Spring Boot 3.x, Java 17+). Latest release: **2.1.0-RELEASE** on Maven Central.
+
 ## 简介
 
 ​		基于 JPA 对需要加密的 String 字段进行加密，入侵性较小（仅在需要加密的 Entity 对象属性上添加注解即可），采用 AES 对称加密保证了效率和安全性。
@@ -151,6 +161,151 @@ public interface UserDao extends JpaRepository<User, Long> {
 - 密钥/IV 配置保持不变，无需更换。
 
 更多设计细节（密文格式规范、架构、发布流程）见 [AGENTS.md](AGENTS.md)。
+
+## English Documentation
+
+### Overview
+
+`encrypt-jpa-spring-boot-starter` provides transparent encryption for JPA `String` entity
+fields with minimal intrusion — a single `@Encrypt` annotation per field. It works by
+intercepting Spring Data repository calls with a Spring AOP aspect:
+
+- **Writes** (`save`, `saveAll`, …): annotated `String` fields (including fields declared
+  in `@MappedSuperclass` superclasses) are encrypted with AES before being persisted.
+- **Reads**: results of any repository method (`Iterable`/`List`/`Page`/`Slice`,
+  `Optional`, or a single object) are decrypted back to plaintext.
+- **Query parameters** annotated with `@EncryptParam` are encrypted before the query runs,
+  so `WHERE phone = ?` equality matching keeps working against ciphertext.
+- **2.1.0 — blind indexes**: fields annotated with `@BlindIndex` get an HMAC n-gram shadow
+  column, enabling `LIKE`-style fuzzy search (prefix / infix / suffix / single character /
+  full value) over encrypted columns.
+
+The starter is fully automatic: register the dependency, set `acshmily.encrypt.enabled=true`
+and nothing else changes in your business code.
+
+### Installation
+
+Pick the flavor matching your Spring Boot generation (both are on Maven Central):
+
+```xml
+<!-- Spring Boot 2.x (javax namespace, Java 8~21) -->
+<dependency>
+  <groupId>com.github.acshmily</groupId>
+  <artifactId>encrypt-jpa-spring-boot-starter</artifactId>
+  <version>2.1.0-RELEASE</version>
+</dependency>
+
+<!-- Spring Boot 3.x (jakarta namespace, Java 17+) -->
+<dependency>
+  <groupId>com.github.acshmily</groupId>
+  <artifactId>encrypt-jpa-jakarta-spring-boot-starter</artifactId>
+  <version>2.1.0-RELEASE</version>
+</dependency>
+```
+
+### Quick start
+
+1. Configure (key shorter than 32 chars / IV shorter than 16 chars are left-padded with
+   `0`; missing or oversized values fail fast at startup):
+
+```yaml
+acshmily:
+  encrypt:
+    enabled: true
+    encrypt-key: 12345678901234561234567890123456
+    encrypt-iv: 1234567890123456
+```
+
+2. Annotate entity fields. Deterministic mode (default) keeps equality search working;
+   `random = true` gives per-value random IVs — the strongest security, but the column can
+   no longer be used with `WHERE col = ?`:
+
+```java
+@Entity
+public class User {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Encrypt                                  // deterministic, equality-searchable
+    private String phone;
+
+    @Encrypt(random = true)                   // random IV, not equality-searchable
+    private String idCard;
+}
+```
+
+3. Annotate query parameters for equality search (any parameter position; derived verbs
+   like `existsBy…`/`countBy…` and custom `@Query` methods are covered):
+
+```java
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByPhone(@EncryptParam String phone);
+    boolean existsByPhone(@EncryptParam String phone);
+}
+```
+
+4. (Optional) Fuzzy search via blind index — declare a shadow column and let the starter
+   populate it automatically:
+
+```java
+@Encrypt(random = true)                       // with a blind index, prefer random IV
+private String phone;
+
+@BlindIndex("phone")                          // value = source field name
+@Column(name = "phone_bidx", length = 4000)   // ~34 chars of index per input char; enlarge the column!
+private String phoneBidx;
+```
+
+```java
+// one parameter covers prefix / infix / suffix / single char / full value
+List<User> findByPhoneBidxContaining(@BlindIndexParam String keyword);
+```
+
+5. (Optional) Manual encrypt/decrypt anywhere in your code:
+
+```java
+@Resource
+private JpaEncryptService jpaEncryptService;   // encrypt(...) / deEncrypt(...)
+```
+
+### Cipher format
+
+- **v2 (written by 2.x)**: `"enc:v2:" + Base64(IV[16] + AES/CBC/PKCS5 ciphertext)` with the
+  IV embedded per value. Deterministic mode reuses the configured static IV so equal
+  plaintexts yield equal ciphertexts (required for SQL equality matching); `random` mode
+  draws a fresh IV per encryption. No length limit (1.x had a 1024-byte cap).
+- **v1 (legacy, decrypt-only)**: unprefixed `Base64(AES/CBC/PKCS5 ciphertext)` with the
+  static IV — data written by 1.x remains readable. Undecryptable values (e.g. plaintext
+  rows written before encryption was enabled) are returned as-is instead of throwing.
+
+Key derivation is unchanged from 1.x: `encryptKey` is left-padded with `0` to 32 bytes,
+`encryptIv` to 16 bytes.
+
+### Blind index notes & constraints
+
+- Normalization is `trim().toLowerCase()` (English case-insensitive; no effect on CJK).
+- `LIKE '%x%'` cannot use a database index — suitable for small-to-medium tables. For
+  high-frequency equality lookups prefer deterministic `@Encrypt` + `@EncryptParam`.
+- Storage amplification is ~34 chars per input character: `varchar(255)` only supports
+  ~7 characters of plaintext; use `length >= 4000` or `TEXT`. Do **not** put a blind
+  index on long text fields (the index column overflows and the insert fails on purpose).
+- Tokens are 64-bit truncated HMAC-SHA256 values; collisions only approach the birthday
+  bound at millions of rows — verify matches in application code if that matters.
+- Unsupported: unordered multi-word queries, regex, cross-field search. Do not feed an
+  already-converted token fragment back as a query parameter (conversion is not idempotent).
+- Optional dedicated index key: `acshmily.encrypt.index-key` (defaults to a value derived
+  from `encryptKey`; the derivation formula is a compatibility contract).
+
+### Migrating from 1.x
+
+- Existing v1 ciphertext and pre-encryption plaintext rows remain readable.
+- New writes are v2; equality queries with `@EncryptParam` no longer match legacy v1 rows
+  until the data is rewritten (re-save entities or batch-rewrite with `JpaEncryptService`).
+- Downgrading back to 1.1.3 cannot read v2 data — evaluate before upgrading.
+- Keys/IVs carry over unchanged; no configuration migration needed.
+
+See [AGENTS.md](AGENTS.md) for the full design documentation (cipher format
+specification with test vectors, interceptor internals, release process).
 
 ## License
 
