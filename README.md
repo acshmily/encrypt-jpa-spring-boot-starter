@@ -2,9 +2,17 @@
 
 ## 简介
 
-​		基于JPA对需要加密的String 字段进行加密，入侵性较小（仅在需要加密的Entity对象属性上添加注解即可），采用AES对称加密保证了效率和安全性
+​		基于 JPA 对需要加密的 String 字段进行加密，入侵性较小（仅在需要加密的 Entity 对象属性上添加注解即可），采用 AES 对称加密保证了效率和安全性。
 
 LastUpdate:
+   - 2026年10月13日:
+        - 发布 **2.0.0-RELEASE**（重大版本，建议从 1.x 迁移，见下方「2.0.0 迁移说明」）
+        - **双产物发布**：javax 版（Boot 2.x / Java 8~21）与 jakarta 版（Boot 3.x / Java 17+）
+        - 修复多项 1.x 逻辑缺陷（参数下标错位、重复保存双重加密、1024 字节上限、null 崩溃、父类字段漏加密等）
+        - 版本化密文格式（v2 带前缀 + 内嵌 IV），1.x 存量数据（v1）仍可解密
+        - `@Encrypt(random = true)` 可选随机 IV 模式（安全性最优，不可等值查询）
+        - 拦截范围扩大到全部 Repository 方法（saveAll/getBy*/existsBy*/countBy*/自定义 @Query 等）
+        - 从零建立全量测试（61 个用例：正常 + 异常路径）
    - 2020年09月15日:
         - 更新到了**1.1.3**版本
         - 拦截器添加了CrudRepository、PagingAndSortingRepository
@@ -12,43 +20,53 @@ LastUpdate:
         - 更新到**1.1.2**版本，解决了重大缺陷，请务必更新
         - 优化了反射缓存机制，提高执行效率
    - 2020年09月10日:
-    
         - 新增了@EncryptParam注解方法，解决了参数加密问题;
         - 新增了JpaEncryptService接口并注册到Spring可以直接注入使用
         - 修复部分bug
 
 目前已经实现：
 
-- 对所有save方法进行加密后保存
-- 对所有find方法返回（page、List、单个对象）进行解密返回
+- 对所有 Repository 写入方法（save/saveAll 等）加密后保存，含父类（@MappedSuperclass）字段
+- 对查询返回（Iterable/List/Page/Slice、Optional、单个对象）解密返回
+- `@EncryptParam` 参数自动加密（支持等值查询），覆盖 findBy/getBy/existsBy/countBy/自定义 @Query
+- 存量 v1 密文与明文数据自动兼容（解不开的值原样返回，不会让查询抛异常）
 
 未实现：
 
 - 对非String属性的加密
+- 返回 `Stream<T>` 的方法不解密
 
 ## 说明
 
-1、maven座标
+1、maven 座标——按你的 Spring Boot 版本二选一：
 
 ```xml
+<!-- Spring Boot 2.x（javax，Java 8~21） -->
 <dependency>
   <groupId>com.github.acshmily</groupId>
   <artifactId>encrypt-jpa-spring-boot-starter</artifactId>
-  <version>1.1.3-RELEASE</version>
+  <version>2.0.0-RELEASE</version>
+</dependency>
+
+<!-- Spring Boot 3.x（jakarta，Java 17+） -->
+<dependency>
+  <groupId>com.github.acshmily</groupId>
+  <artifactId>encrypt-jpa-jakarta-spring-boot-starter</artifactId>
+  <version>2.0.0-RELEASE</version>
 </dependency>
 ```
 
-2、在你的配置文件内添加必须要的信息，当**encryptKey**不足32位时，会自动补0，当**encryptIv**不位16位时候，会自动补0，
+2、在你的配置文件内添加必须要的信息，当**encrypt-key**不足32位时，会自动左侧补0，当**encrypt-iv**不足16位时，会自动左侧补0（与 1.x 规则一致；2.0.0 起缺失或超长会在启动时直接报错）：
 
 ```yml
 acshmily:
   encrypt:
-    enabled: true ## 开启AOP加密
-    encryptKey: 12345678901234561234567890123456
-    encryptIv: 1234567890123456
+    enabled: true # 开启AOP加密
+    encrypt-key: 12345678901234561234567890123456
+    encrypt-iv: 1234567890123456
 ```
 
-3、修改你的entity对象，在需要加密的String字段上添加 **@Encrypt** 注解
+3、修改你的entity对象，在需要加密的String字段上添加 **@Encrypt** 注解。默认确定性加密（相同明文=相同密文，可配合 `@EncryptParam` 做等值查询）；不需要等值查询的字段可用 **@Encrypt(random = true)** 获得更强的安全性（随机 IV，相同明文产生不同密文）：
 
 ```java
 @Entity
@@ -60,43 +78,50 @@ public class TestEncrypt {
     private Long id;
     @Encrypt
     private String username;
-
+    @Encrypt(random = true) // 随机 IV：更安全，但该字段不能用于 WHERE col = ? 查询
+    private String idCard;
 ```
 
-4、如果重写或者新增find*方法，使用**@EncryptParam**注释，使用该注释的参数会被执行查询的时候自动加密
+4、查询方法的参数使用 **@EncryptParam** 注解，执行查询时会自动加密（下标任意位置均可）：
 ```java
 @Repository
 public interface EncryptDao extends JpaRepository<TestEncrypt,Long> {
-    Page<TestEncryp> findAllByIdGreaterThan(Long id,Pageable pageable);
-    TestEncryp findByUsername(@EncryptParam @Param("username") String username);
-    TestEncryp findByIdAndUsername(@EncryptParam Long id,@EncryptParam String username);
+    Page<TestEncrypt> findAllByIdGreaterThan(Long id,Pageable pageable);
+    TestEncrypt findByUsername(@EncryptParam String username);
+    TestEncrypt findByIdAndUsername(@EncryptParam Long id,@EncryptParam String username);
+    boolean existsByUsername(@EncryptParam String username); // 2.0.0：派生谓词与自定义 @Query 均已覆盖
 }
 ```
-5、如果需要自己执行加密解密操作可以直接使用注解,使用**jpaEncryptService**的相关方法
+5、如果需要自己执行加密解密操作可以直接注入 **JpaEncryptService**：
 ```java
 @Resource
 private JpaEncryptService jpaEncryptService;
-
 ```
 JpaEncryptService定义方法如下:
 ```java
 public interface JpaEncryptService {
     /**
-     * 加密方法
-     * @param rawString
-     * @return
+     * 加密方法（确定性，输出可直接用于等值查询参数）
      */
-    String encrypt(@NotNull String rawString);
+    String encrypt(String rawString);
 
     /**
-     * 解密方法
-     * @param encryptString
-     * @return
+     * 解密方法（自动识别 v2 / v1 格式）
      */
-    String deEncrypt(@NotNull String encryptString);
-
+    String deEncrypt(String encryptString);
 }
 ```
+注意：2.0.0 起加解密失败会抛出 `com.github.acshmily.exception.EncryptException`（1.x 静默返回空字符串）。
+
+## 2.0.0 迁移说明
+
+- **存量数据可读**：1.x 写入的密文（v1，无前缀）与加密启用前的明文数据，读取时自动兼容（明文/解不开的值原样返回）。
+- **等值查询需迁移**：新写入的均为 v2 格式（带 `enc:v2:` 前缀），对 v1 存量行的等值查询不再命中。迁移方式：遍历实体重新 save，或用 `JpaEncryptService` 批量重写。
+- **单向不兼容**：降级回 1.1.3 后无法读取 v2 格式数据，升级前请评估。
+- 密钥/IV 配置保持不变，无需更换。
+
+更多设计细节（密文格式规范、架构、发布流程）见 [AGENTS.md](AGENTS.md)。
+
 ## License
 
 ```
