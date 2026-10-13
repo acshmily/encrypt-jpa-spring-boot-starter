@@ -70,8 +70,8 @@ class JpaEncryptIntegrationTest {
         assertThat(byName).hasSize(1);
         assertThat(byName.get(0).getPhone()).isEqualTo("13800000002");
 
-        // Page
-        Page<User> page = userRepository.findAll(PageRequest.of(0, 10));
+        // Page（页放大以容纳其他测试类共享库中的存量行）
+        Page<User> page = userRepository.findAll(PageRequest.of(0, 100));
         assertThat(page.getContent()).isNotEmpty();
         assertThat(page.getContent().stream().map(User::getPhone)).contains("13800000002");
     }
@@ -199,12 +199,13 @@ class JpaEncryptIntegrationTest {
 
     @Test
     void oversizedTextBeyondLegacyLimit() {
-        // 回归：1.x 存在 1024 字节硬上限；2.0.0 任意长度
+        // 回归：1.x 的 commons-crypto 固定 1024 字节 buffer，超长直接 ShortBufferException。
+        // 超长文本只放在无盲索引的字段（email 建了盲索引，其存储放大约 34 倍，
+        // 长文本字段不适合 @BlindIndex——产品约束，见 AGENTS.md）
         String bigText = repeat("汉字与unicode混合-", 200); // 约 3400 字节 UTF-8
-        User saved = userRepository.save(new User("big", "13800000012", bigText, bigText));
+        User saved = userRepository.save(new User("big", "13800000012", null, bigText));
 
         User found = userRepository.findById(saved.getId()).get();
-        assertThat(found.getEmail()).isEqualTo(bigText);
         assertThat(found.getSecretNote()).isEqualTo(bigText);
     }
 

@@ -1,7 +1,9 @@
 package com.github.acshmily.test.domain;
 
+import com.github.acshmily.annotation.BlindIndex;
 import com.github.acshmily.annotation.Encrypt;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -23,10 +25,20 @@ public class User extends BaseSecretEntity {
     @Encrypt
     private String phone;
 
-    /** 随机 IV 加密：安全性最优，但不可用于等值查询（列加长以容纳超长文本的密文） */
+    /** phone 的盲索引影子列（2.1.0）：LIKE 模糊查询 */
+    @BlindIndex("phone")
+    @Column(name = "phone_bidx", length = 4000)
+    private String phoneBidx;
+
+    /** 随机 IV 加密：安全性最优，等值不可查；模糊查询走盲索引 */
     @Encrypt(random = true)
-    @javax.persistence.Column(length = 8000)
+    @Column(length = 8000)
     private String email;
+
+    /** email 的盲索引影子列：验证随机加密字段 + 盲索引组合 */
+    @BlindIndex("email")
+    @Column(name = "email_bidx", length = 4000)
+    private String emailBidx;
 
     public User() {
     }
@@ -54,11 +66,19 @@ public class User extends BaseSecretEntity {
         this.phone = phone;
     }
 
+    public String getPhoneBidx() {
+        return phoneBidx;
+    }
+
     public String getEmail() {
         return email;
     }
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getEmailBidx() {
+        return emailBidx;
     }
 }

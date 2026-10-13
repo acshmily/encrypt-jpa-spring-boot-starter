@@ -93,4 +93,31 @@ class EncryptPropertiesTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("16");
     }
+
+    // ---------- 盲索引密钥 ----------
+
+    @Test
+    void blindIndexKeyDerivedFromEncryptKeyAndCached() {
+        EncryptProperties p = properties("my-key", "my-iv");
+        assertThat(p.getBlindIndexKey()).isNotNull().isSameAs(p.getBlindIndexKey());
+        // 派生稳定：同 encryptKey → 同 indexKey
+        assertThat(properties("my-key", "my-iv").getBlindIndexKey().getEncoded())
+                .isEqualTo(p.getBlindIndexKey().getEncoded());
+        // 不同 encryptKey → 不同 indexKey
+        assertThat(properties("other-key", "my-iv").getBlindIndexKey().getEncoded())
+                .isNotEqualTo(p.getBlindIndexKey().getEncoded());
+    }
+
+    @Test
+    void explicitIndexKeyOverridesDerivation() throws Exception {
+        EncryptProperties p = new EncryptProperties();
+        p.setEnabled(true);
+        p.setEncryptKey("my-key");
+        p.setEncryptIv("my-iv");
+        p.setIndexKey("explicit-index-key");
+        p.afterPropertiesSet();
+
+        assertThat(p.getBlindIndexKey().getEncoded())
+                .isEqualTo("explicit-index-key".getBytes("UTF-8"));
+    }
 }

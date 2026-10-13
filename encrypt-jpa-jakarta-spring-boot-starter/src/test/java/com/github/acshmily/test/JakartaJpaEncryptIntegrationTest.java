@@ -111,6 +111,35 @@ class JakartaJpaEncryptIntegrationTest {
                 .isInstanceOf(EncryptException.class);
     }
 
+    // ---------- 盲索引模糊查询（2.1.0） ----------
+
+    @Test
+    void blindIndexFuzzySearchWorks() {
+        userRepository.save(new User("jack", "13812345678", "jack@example.com", "note"));
+
+        // 影子列由切面自动填充；模糊查询前缀/中缀/单字命中，未命成为空
+        assertThat(userRepository.findByPhoneBidxContaining("138")).isNotEmpty();
+        assertThat(userRepository.findByPhoneBidxContaining("2345")).isNotEmpty();
+        assertThat(userRepository.findByPhoneBidxContaining("7")).isNotEmpty();
+        assertThat(userRepository.findByPhoneBidxContaining("9999")).isEmpty();
+        assertThat(userRepository.findByPhoneBidxContaining("8132")).isEmpty(); // 非连续不命中
+    }
+
+    @Test
+    void blindIndexUpdateAndRepeatSave() {
+        User saved = userRepository.save(new User("upd", "13111111111", "u@example.com", "note"));
+        assertThat(userRepository.findByPhoneBidxContaining("13111111111")).isNotEmpty();
+
+        saved.setPhone("13222222222");
+        userRepository.save(saved);
+        assertThat(userRepository.findByPhoneBidxContaining("13111111111")).isEmpty();
+        assertThat(userRepository.findByPhoneBidxContaining("13222222222")).isNotEmpty();
+
+        // 重复 save 不污染索引
+        userRepository.save(saved);
+        assertThat(userRepository.findByPhoneBidxContaining("13222222222")).isNotEmpty();
+    }
+
     private String rawColumn(Long id, String column) {
         return jdbcTemplate.queryForObject("select " + column + " from users where id = ?", String.class, id);
     }

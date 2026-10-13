@@ -6,6 +6,10 @@
 
 LastUpdate:
    - 2026年10月13日:
+        - 发布 **2.1.0-RELEASE**：新增**盲索引**（@BlindIndex + @BlindIndexParam），密文字段支持 LIKE 模糊查询（前缀/中缀/后缀/单字/整值统一支持）
+        - 新增可选配置 `acshmily.encrypt.index-key`（盲索引独立密钥，缺省自动派生）
+        - 测试扩至 94 个（新增 33 个盲索引用例）
+   - 2026年10月13日:
         - 发布 **2.0.0-RELEASE**（重大版本，建议从 1.x 迁移，见下方「2.0.0 迁移说明」）
         - **双产物发布**：javax 版（Boot 2.x / Java 8~21）与 jakarta 版（Boot 3.x / Java 17+）
         - 修复多项 1.x 逻辑缺陷（参数下标错位、重复保存双重加密、1024 字节上限、null 崩溃、父类字段漏加密等）
@@ -112,6 +116,32 @@ public interface JpaEncryptService {
 }
 ```
 注意：2.0.0 起加解密失败会抛出 `com.github.acshmily.exception.EncryptException`（1.x 静默返回空字符串）。
+
+6、**模糊查询（LIKE）**——2.1.0 新增盲索引。密文无法直接 LIKE，本库通过「顺序 n-gram + 连续片段 HMAC 匹配」在影子列建立盲索引，前缀/中缀/后缀/单字/整值统一支持：
+
+```java
+@Entity
+public class User {
+    @Encrypt(random = true)                        // 有盲索引后推荐随机 IV（查询已由索引承担）
+    private String phone;
+
+    @BlindIndex("phone")                           // 影子列：库自动填充，业务不读不写
+    @Column(name = "phone_bidx", length = 4000)    // 存储放大约 34 倍/字符，列务必加长（255 只够约 7 字符）
+    private String phoneBidx;
+}
+
+@Repository
+public interface UserDao extends JpaRepository<User, Long> {
+    // 前缀/中缀/后缀/整值统一模糊匹配；等值也可用 Containing
+    List<User> findByPhoneBidxContaining(@BlindIndexParam String keyword);
+}
+```
+
+要点与限制（详见 AGENTS.md「盲索引」章节）：
+- 归一化规则为 trim + 小写（英文大小写不敏感，中文无影响）
+- `LIKE '%x%'` 为全表扫描，适用中小数据量；等值高频场景仍推荐确定性加密 + `@EncryptParam`（可建 DB 索引）
+- 长文本字段（几百字符以上）不建议建盲索引（索引列会溢出）
+- 不支持无序多词与正则；可选配置 `acshmily.encrypt.index-key` 使用独立索引密钥（缺省自动从 encryptKey 派生）
 
 ## 2.0.0 迁移说明
 

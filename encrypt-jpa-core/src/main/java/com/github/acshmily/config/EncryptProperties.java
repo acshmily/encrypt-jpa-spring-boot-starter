@@ -1,5 +1,6 @@
 package com.github.acshmily.config;
 
+import com.github.acshmily.utils.BlindIndexUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
@@ -33,11 +34,21 @@ public class EncryptProperties implements InitializingBean {
     /** 加密偏移量（v1 静态 IV），长度 1~16 字符，不足左侧补 '0' 至 16 字节 */
     private String encryptIv;
 
+    /**
+     * 盲索引独立密钥（2.1.0，可选）。未配置时从 encryptKey 派生：
+     * HMAC-SHA256(encryptKey, "encrypt-jpa-blind-index-v1") 全 32 字节。
+     * 派生规则勿改动（更换会使存量索引全部失效）。
+     */
+    private String indexKey;
+
     /** 32 字节 AES 密钥，初始化时构建一次 */
     private SecretKeySpec key;
 
     /** 16 字节静态 IV（v1 兼容解密用），初始化时构建一次 */
     private IvParameterSpec iv;
+
+    /** 盲索引 HMAC 密钥，初始化时构建一次 */
+    private SecretKeySpec blindIndexKey;
 
     @Override
     public void afterPropertiesSet() {
@@ -61,6 +72,24 @@ public class EncryptProperties implements InitializingBean {
         }
         this.key = new SecretKeySpec(padZero(encryptKey, 32).getBytes(StandardCharsets.UTF_8), "AES");
         this.iv = new IvParameterSpec(padZero(encryptIv, 16).getBytes(StandardCharsets.UTF_8));
+        this.blindIndexKey = deriveBlindIndexKey();
+    }
+
+    /**
+     * 盲索引密钥：显式配置了 indexKey 则直接使用；否则以 encryptKey 为密钥派生。
+     * 派生公式为兼容性契约（勿改动，更换会使存量索引全部失效）：
+     * HMAC-SHA256(key = encryptKey 原始字节, msg = "encrypt-jpa-blind-index-v1")。
+     */
+    private SecretKeySpec deriveBlindIndexKey() {
+        byte[] material;
+        if (StringUtils.hasText(indexKey)) {
+            material = indexKey.getBytes(StandardCharsets.UTF_8);
+        } else {
+            material = BlindIndexUtils.hmacSha256(
+                    encryptKey.getBytes(StandardCharsets.UTF_8),
+                    BlindIndexUtils.DERIVATION_MESSAGE.getBytes(StandardCharsets.UTF_8));
+        }
+        return new SecretKeySpec(material, "HmacSHA256");
     }
 
     /**
@@ -93,6 +122,19 @@ public class EncryptProperties implements InitializingBean {
 
     public void setEncryptIv(String encryptIv) {
         this.encryptIv = encryptIv;
+    }
+
+    public String getIndexKey() {
+        return indexKey;
+    }
+
+    public void setIndexKey(String indexKey) {
+        this.indexKey = indexKey;
+    }
+
+    /** 盲索引 HMAC 密钥，容器启动时构建一次 */
+    public SecretKeySpec getBlindIndexKey() {
+        return blindIndexKey;
     }
 
     /** AES 密钥，容器启动时构建一次 */
