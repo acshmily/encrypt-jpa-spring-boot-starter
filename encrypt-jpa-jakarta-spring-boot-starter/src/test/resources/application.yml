@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:encryptdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+acshmily:
+  encrypt:
+    enabled: true
+    encrypt-key: 0123456789abcdef0123456789abcdef
+    encrypt-iv: 1234567890123456
+
+logging:
+  level:
+    com.github.acshmily: debug
