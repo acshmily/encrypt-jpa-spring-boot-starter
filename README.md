@@ -59,18 +59,18 @@ LastUpdate:
 <dependency>
   <groupId>com.github.acshmily</groupId>
   <artifactId>encrypt-jpa-spring-boot-starter</artifactId>
-  <version>2.0.0-RELEASE</version>
+  <version>2.1.0-RELEASE</version>
 </dependency>
 
 <!-- Spring Boot 3.x（jakarta，Java 17+） -->
 <dependency>
   <groupId>com.github.acshmily</groupId>
   <artifactId>encrypt-jpa-jakarta-spring-boot-starter</artifactId>
-  <version>2.0.0-RELEASE</version>
+  <version>2.1.0-RELEASE</version>
 </dependency>
 ```
 
-2、在你的配置文件内添加必须要的信息，当**encrypt-key**不足32位时，会自动左侧补0，当**encrypt-iv**不足16位时，会自动左侧补0（与 1.x 规则一致；2.0.0 起缺失或超长会在启动时直接报错）：
+2、在你的配置文件内添加必须要的信息，当**encrypt-key**不足32位时，会自动左侧补0，当**encrypt-iv**不足16位时，会自动左侧补0（与 1.x 规则一致；2.0.0 起缺失或超长会在启动时直接报错）。2.1.0 起使用盲索引时可选配 **index-key**（独立索引密钥，缺省自动从 encrypt-key 派生）：
 
 ```yml
 acshmily:
@@ -78,6 +78,7 @@ acshmily:
     enabled: true # 开启AOP加密
     encrypt-key: 12345678901234561234567890123456
     encrypt-iv: 1234567890123456
+    # index-key: my-blind-index-key # 可选：盲索引独立密钥（2.1.0+，缺省自动派生）
 ```
 
 3、修改你的entity对象，在需要加密的String字段上添加 **@Encrypt** 注解。默认确定性加密（相同明文=相同密文，可配合 `@EncryptParam` 做等值查询）；不需要等值查询的字段可用 **@Encrypt(random = true)** 获得更强的安全性（随机 IV，相同明文产生不同密文）：
