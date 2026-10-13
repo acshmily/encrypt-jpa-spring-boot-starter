@@ -1,5 +1,6 @@
 package com.github.acshmily.test.repo;
 
+import com.github.acshmily.annotation.BlindIndexParam;
 import com.github.acshmily.annotation.EncryptParam;
 import com.github.acshmily.test.domain.User;
 import org.springframework.data.domain.Page;
@@ -25,4 +26,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> searchByCustomQuery(@Param("phone") @EncryptParam String phone);
 
     Page<User> findAll(Pageable pageable);
+
+    /** 盲索引模糊查询（2.1.0） */
+    List<User> findByPhoneBidxContaining(@BlindIndexParam String keyword);
 }

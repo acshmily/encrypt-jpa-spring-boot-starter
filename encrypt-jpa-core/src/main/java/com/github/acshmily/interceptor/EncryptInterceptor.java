@@ -2,6 +2,8 @@ package com.github.acshmily.interceptor;
 
 import com.github.acshmily.config.EncryptProperties;
 import com.github.acshmily.exception.EncryptException;
+import com.github.acshmily.utils.BlindIndexBinding;
+import com.github.acshmily.utils.BlindIndexUtils;
 import com.github.acshmily.utils.EncryptCacheContainer;
 import com.github.acshmily.utils.EncryptField;
 import com.github.acshmily.utils.EncryptUtils;
@@ -84,6 +86,7 @@ public class EncryptInterceptor {
     private void encryptParameters(Method method, Object[] args) {
         int[] indexes = cacheContainer.encryptParamIndexesOf(method);
         if (indexes.length == 0) {
+            convertBlindIndexParameters(method, args);
             return;
         }
         for (int index : indexes) {
@@ -94,6 +97,17 @@ public class EncryptInterceptor {
                 }
                 args[index] = EncryptUtils.encryptDeterministic(value,
                         encryptProperties.getKey(), encryptProperties.getIv());
+            }
+        }
+        convertBlindIndexParameters(method, args);
+    }
+
+    /** 把 @BlindIndexParam 的 String 参数转换为盲索引 token 片段（配合 Containing 派生查询实现密文 LIKE） */
+    private void convertBlindIndexParameters(Method method, Object[] args) {
+        int[] indexes = cacheContainer.blindIndexParamIndexesOf(method);
+        for (int index : indexes) {
+            if (index < args.length && args[index] instanceof String) {
+                args[index] = BlindIndexUtils.toQueryToken((String) args[index], encryptProperties.getBlindIndexKey());
             }
         }
     }
@@ -122,10 +136,20 @@ public class EncryptInterceptor {
             return;
         }
         List<EncryptField> fields = cacheContainer.encryptFieldsOf(entity.getClass());
-        if (fields.isEmpty()) {
+        List<BlindIndexBinding> bindings = cacheContainer.blindIndexBindingsOf(entity.getClass());
+        if (fields.isEmpty() && bindings.isEmpty()) {
             return;
         }
         try {
+            // 先用明文构建盲索引。源字段已是 v2 密文（重复 save 同一实例）时跳过重算，
+            // 防止把密文的 gram 写进索引使其失效；字段被修改为新明文时正常重算覆盖。
+            for (BlindIndexBinding binding : bindings) {
+                Object plain = binding.getSourceField().get(entity);
+                if (plain instanceof String && !((String) plain).startsWith(EncryptUtils.V2_PREFIX)) {
+                    binding.getIndexField().set(entity,
+                            BlindIndexUtils.buildIndexValue((String) plain, encryptProperties.getBlindIndexKey()));
+                }
+            }
             for (EncryptField encryptField : fields) {
                 Object raw = encryptField.getField().get(entity);
                 if (!(raw instanceof String)) {
