@@ -61,7 +61,8 @@ class JpaBlindIndexIntegrationTest {
         userRepository.save(new User("single", "13700000000", "s@example.com", "note"));
 
         assertThat(userRepository.findByPhoneBidxContaining("7")).isNotEmpty();
-        assertThat(userRepository.findByPhoneBidxContaining("9")).isEmpty();
+        // 共享库下数字字符可能被其他用例的行命中，负例用不会出现在任何手机号中的字母
+        assertThat(userRepository.findByPhoneBidxContaining("x")).isEmpty();
     }
 
     @Test
